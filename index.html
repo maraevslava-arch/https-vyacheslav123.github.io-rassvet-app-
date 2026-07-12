@@ -1,33 +1,262 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Wind, BookOpen, Settings, X, Plus, Phone, Footprints, Save, Trash2, Home as HomeIcon } from "lucide-react";
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1" />
+<title>Рассвет — путь к трезвости</title>
 
-// ---------- design tokens ----------
-const COLORS = {
-  bgDeep: [16, 22, 31],      // #10161F night
-  bgMid: [30, 44, 61],       // #1E2C3D slate
-  dawnStart: [46, 62, 82],   // pre-dawn slate-blue
-  dawnEnd: [232, 168, 87],   // #E8A857 amber
-  rose: "#C9526B",
-  mist: "#EDE7DC",
-  muted: "#93A3B5",
-  card: "#1B2A3A",
-  cardBorder: "rgba(237,231,220,0.08)",
-};
+<!-- iOS "add to home screen" behaviour -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Рассвет" />
+<meta name="theme-color" content="#10161F" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="icon" href="icon-192.png" />
+<link rel="manifest" href="manifest.json" />
 
-function lerp(a, b, t) { return a + (b - a) * t; }
-function lerpColor(c1, c2, t) {
-  return `rgb(${Math.round(lerp(c1[0], c2[0], t))},${Math.round(lerp(c1[1], c2[1], t))},${Math.round(lerp(c1[2], c2[2], t))})`;
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin: 0; padding: 0; background: #10161F; }
+
+body {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #10161F;
+  color: #EDE7DC;
+  font-family: 'Inter', -apple-system, sans-serif;
+  display: flex;
+  justify-content: center;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
-const MILESTONES = [
-  { days: 1, label: "Первый день" },
-  { days: 7, label: "Неделя ясности" },
-  { days: 30, label: "Месяц" },
-  { days: 90, label: "Квартал" },
-  { days: 180, label: "Полгода" },
-  { days: 365, label: "Год" },
-];
+.screen {
+  width: 100%;
+  max-width: 480px;
+  padding: 20px 20px 100px;
+  min-height: 100vh;
+  min-height: 100dvh;
+  position: relative;
+  display: none;
+}
+.screen.active { display: block; }
 
+.loading { padding: 40px; color: #93A3B5; text-align: center; }
+
+svg.dawn-svg { width: 100%; height: 160px; border-radius: 18px; display: block; margin-top: 4px; }
+
+.counter-block { text-align: center; margin-top: -34px; position: relative; z-index: 2; }
+.counter-num {
+  display: block; font-family: 'IBM Plex Mono', monospace; font-weight: 600;
+  font-size: 68px; line-height: 1; letter-spacing: -1px; font-variant-numeric: tabular-nums;
+  color: #F4EFE6; text-shadow: 0 2px 24px rgba(232,168,87,0.25);
+}
+.counter-label { display: block; margin-top: 6px; font-size: 13px; color: #93A3B5; text-transform: uppercase; letter-spacing: 1.5px; }
+
+.stats-row { display: flex; gap: 10px; margin-top: 22px; }
+.stat-card { flex: 1; background: #1B2A3A; border: 1px solid rgba(237,231,220,0.08); border-radius: 14px; padding: 14px; text-align: center; }
+.stat-value { display: block; font-family: 'Fraunces', serif; font-size: 20px; font-weight: 600; color: #E8A857; }
+.stat-caption { display: block; margin-top: 4px; font-size: 11.5px; color: #93A3B5; }
+
+.sos-btn {
+  width: 100%; margin-top: 18px; background: #C9526B; color: #FBEEF0; border: none; border-radius: 14px;
+  padding: 15px; font-size: 15px; font-weight: 600; font-family: 'Inter', sans-serif;
+  display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+}
+.sos-btn:active { transform: scale(0.98); }
+
+.milestones-row { display: flex; justify-content: space-between; margin-top: 26px; padding: 0 2px; }
+.milestone-dot { width: 30px; height: 30px; border-radius: 50%; background: #1B2A3A; border: 1px solid rgba(237,231,220,0.12); display: flex; align-items: center; justify-content: center; }
+.milestone-reached { background: #E8A857; border-color: #E8A857; }
+.milestone-day { font-family: 'IBM Plex Mono', monospace; font-size: 9.5px; color: #93A3B5; }
+.milestone-reached .milestone-day { color: #10161F; font-weight: 600; }
+
+.disclaimer { margin-top: 22px; font-size: 12px; line-height: 1.6; color: #6C7A8A; border-top: 1px solid rgba(237,231,220,0.08); padding-top: 14px; }
+.save-warning { margin-top: 14px; font-size: 12px; color: #C9526B; }
+
+.screen-header { display: flex; align-items: center; justify-content: space-between; }
+.screen-title { font-family: 'Fraunces', serif; font-size: 24px; font-weight: 600; margin: 4px 0 18px; }
+
+.icon-btn {
+  background: #1B2A3A; border: 1px solid rgba(237,231,220,0.1); color: #EDE7DC; border-radius: 10px;
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+
+.empty-state { text-align: center; color: #93A3B5; padding: 50px 20px; display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 14px; line-height: 1.6; }
+
+.entry-card { background: #1B2A3A; border: 1px solid rgba(237,231,220,0.08); border-radius: 14px; padding: 14px; margin-bottom: 10px; }
+.entry-top { display: flex; align-items: center; gap: 10px; }
+.entry-mood { font-size: 13px; font-weight: 600; }
+.entry-date { font-size: 11.5px; color: #6C7A8A; flex: 1; }
+.entry-delete { width: 28px; height: 28px; background: transparent; border: none; color: #6C7A8A; cursor: pointer; }
+.entry-note { margin: 8px 0 0; font-size: 13.5px; line-height: 1.55; color: #D8D1C4; }
+
+.journal-form { background: #1B2A3A; border: 1px solid rgba(237,231,220,0.08); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+.field-label { font-size: 12.5px; color: #93A3B5; margin: 0 0 8px; }
+.mood-row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.mood-chip { background: transparent; border-radius: 20px; padding: 7px 14px; font-size: 12.5px; cursor: pointer; }
+.journal-textarea {
+  width: 100%; background: #10161F; border: 1px solid rgba(237,231,220,0.12); border-radius: 10px;
+  color: #EDE7DC; padding: 10px 12px; font-family: 'Inter', sans-serif; font-size: 13.5px; resize: vertical;
+}
+.form-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 12px; }
+.btn { border-radius: 10px; padding: 9px 16px; font-size: 13.5px; font-weight: 600; cursor: pointer; border: none; display: inline-flex; align-items: center; gap: 6px; font-family: 'Inter', sans-serif; }
+.btn-primary { background: #E8A857; color: #10161F; }
+.btn-ghost { background: transparent; color: #93A3B5; border: 1px solid rgba(237,231,220,0.15); }
+
+.settings-card { background: #1B2A3A; border: 1px solid rgba(237,231,220,0.08); border-radius: 14px; padding: 16px; margin-bottom: 12px; }
+.text-input { width: 100%; background: #10161F; border: 1px solid rgba(237,231,220,0.12); border-radius: 10px; color: #EDE7DC; padding: 10px 12px; font-size: 14px; font-family: 'IBM Plex Mono', monospace; }
+.settings-static { font-size: 15px; font-family: 'Fraunces', serif; }
+.settings-static-small { font-size: 12.5px; line-height: 1.6; color: #93A3B5; }
+.btn-reset { margin-top: 12px; width: 100%; justify-content: center; }
+
+.install-hint { background: #1B2A3A; border: 1px solid rgba(232,168,87,0.25); border-radius: 14px; padding: 14px; margin-bottom: 16px; font-size: 12.5px; line-height: 1.6; color: #D8D1C4; }
+.install-hint b { color: #E8A857; }
+
+.tab-bar {
+  position: fixed; bottom: 0; left: 0; right: 0; display: flex; justify-content: center;
+  background: rgba(16,22,31,0.92); backdrop-filter: blur(10px); border-top: 1px solid rgba(237,231,220,0.08);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.tab-btn { flex: 1; max-width: 160px; background: transparent; border: none; color: #6C7A8A; padding: 12px 0 10px; display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; font-family: 'Inter', sans-serif; cursor: pointer; }
+.tab-active { color: #E8A857; }
+
+.modal-backdrop { position: fixed; inset: 0; background: rgba(10,14,20,0.82); display: none; align-items: flex-end; justify-content: center; z-index: 50; }
+.modal-backdrop.active { display: flex; }
+.modal-panel { width: 100%; max-width: 480px; background: #182432; border-radius: 22px 22px 0 0; padding: 24px 22px calc(30px + env(safe-area-inset-bottom)); position: relative; }
+.close-btn { position: absolute; top: 16px; right: 16px; }
+.modal-eyebrow { font-size: 12px; letter-spacing: 1.5px; text-transform: uppercase; color: #C9526B; margin: 0 0 4px; }
+.modal-title { font-family: 'Fraunces', serif; font-size: 24px; margin: 0 0 20px; }
+.breath-wrap { display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 20px 0 24px; }
+.breath-circle { width: 100px; height: 100px; border-radius: 50%; background: radial-gradient(circle at 40% 35%, #E8A857, #C9526B); transition-property: transform; transition-timing-function: ease-in-out; }
+.breath-label { font-size: 14px; color: #93A3B5; letter-spacing: 1px; text-transform: uppercase; }
+.modal-hint { font-size: 13px; line-height: 1.6; color: #93A3B5; text-align: center; margin: 0 0 18px; }
+.tips-grid { display: flex; flex-direction: column; gap: 8px; }
+.tip { display: flex; align-items: center; gap: 10px; background: #1B2A3A; border-radius: 10px; padding: 10px 12px; font-size: 13px; color: #D8D1C4; }
+.modal-divider { height: 1px; background: rgba(237,231,220,0.08); margin: 18px 0 14px; }
+.modal-note { font-size: 12px; line-height: 1.6; color: #6C7A8A; margin: 0; }
+
+@media (prefers-reduced-motion: reduce) { .breath-circle { transition-duration: 0.3s !important; } }
+@media (max-width: 360px) { .counter-num { font-size: 56px; } }
+</style>
+</head>
+<body>
+
+<div id="loading" class="loading">Загружаю…</div>
+
+<div id="home" class="screen">
+  <svg id="dawnSvg" class="dawn-svg" viewBox="0 0 320 160" preserveAspectRatio="none"></svg>
+
+  <div class="counter-block">
+    <span id="counterNum" class="counter-num">0</span>
+    <span id="counterLabel" class="counter-label">дней трезвости</span>
+  </div>
+
+  <div class="stats-row">
+    <div class="stat-card">
+      <span id="moneySaved" class="stat-value">0 ₽</span>
+      <span class="stat-caption">сэкономлено</span>
+    </div>
+    <div class="stat-card">
+      <span id="nextMilestoneDays" class="stat-value">—</span>
+      <span id="nextMilestoneCaption" class="stat-caption">до следующей вехи</span>
+    </div>
+  </div>
+
+  <button class="sos-btn" onclick="openSOS()">💨 Тянет выпить — помоги сейчас</button>
+
+  <div id="milestonesRow" class="milestones-row"></div>
+
+  <p id="saveWarning" class="save-warning" style="display:none">Не удалось сохранить данные. Изменения могут не сохраниться.</p>
+
+  <div class="install-hint">
+    <b>Совет:</b> добавь эту страницу на экран «Домой» через кнопку «Поделиться» в Safari → «На экран Домой» — будет открываться как обычное приложение.
+  </div>
+
+  <p class="disclaimer">Если за плечами долгий тяжёлый запой, резкий отказ от алкоголя может быть опасен для здоровья. Перед стартом стоит посоветоваться с наркологом.</p>
+</div>
+
+<div id="journal" class="screen">
+  <div class="screen-header">
+    <h2 class="screen-title">Дневник</h2>
+    <button id="newEntryBtn" class="icon-btn" onclick="showJournalForm(true)">+</button>
+  </div>
+
+  <div id="journalForm" class="journal-form" style="display:none">
+    <p class="field-label">Как сейчас</p>
+    <div id="moodRow" class="mood-row"></div>
+    <p class="field-label">Что происходит / что тянет выпить</p>
+    <textarea id="journalNote" class="journal-textarea" rows="3" placeholder="Например: тяжёлый день на работе, звонили старые друзья…"></textarea>
+    <div class="form-actions">
+      <button class="btn btn-ghost" onclick="showJournalForm(false)">Отмена</button>
+      <button class="btn btn-primary" onclick="saveEntry()">Сохранить</button>
+    </div>
+  </div>
+
+  <div id="entriesEmpty" class="empty-state" style="display:none">
+    <p>Пока пусто. Запиши, что чувствуешь сейчас — так проще заметить свои триггеры.</p>
+  </div>
+
+  <div id="entriesList"></div>
+</div>
+
+<div id="settings" class="screen">
+  <h2 class="screen-title">Настройки</h2>
+
+  <div class="settings-card">
+    <label class="field-label" for="priceInput">Сколько в среднем уходило на алкоголь в день, ₽</label>
+    <input id="priceInput" type="number" class="text-input" min="0" />
+  </div>
+
+  <div class="settings-card">
+    <p class="field-label">Дата начала трезвости</p>
+    <p id="startDateDisplay" class="settings-static">—</p>
+    <button class="btn btn-ghost btn-reset" onclick="resetStart()">Начать отсчёт заново — сегодня</button>
+  </div>
+
+  <div class="settings-card">
+    <p class="field-label">Если тяжело прямо сейчас</p>
+    <p class="settings-static-small">📞 Обратись в наркологический диспансер своего города или на горячую линию психологической помощи — искать лучше заранее, а не в кризис.</p>
+  </div>
+</div>
+
+<nav class="tab-bar">
+  <button class="tab-btn tab-active" id="tabHome" onclick="switchView('home')">🏠<span>Путь</span></button>
+  <button class="tab-btn" id="tabJournal" onclick="switchView('journal')">📓<span>Дневник</span></button>
+  <button class="tab-btn" id="tabSettings" onclick="switchView('settings')">⚙️<span>Настройки</span></button>
+</nav>
+
+<div id="sosModal" class="modal-backdrop">
+  <div class="modal-panel">
+    <button class="icon-btn close-btn" onclick="closeSOS()">✕</button>
+    <p class="modal-eyebrow">Это пройдёт</p>
+    <h2 class="modal-title">Подыши со мной</h2>
+    <div class="breath-wrap">
+      <div id="breathCircle" class="breath-circle"></div>
+      <span id="breathLabel" class="breath-label">Вдох</span>
+    </div>
+    <p class="modal-hint">Техника 4–7–8 успокаивает нервную систему за пару минут. Дыши в своём темпе, циклы повторятся сами.</p>
+    <div class="tips-grid">
+      <div class="tip">🚶 Выйди пройтись — 10 минут решают многое</div>
+      <div class="tip">💧 Выпей стакан воды медленно, маленькими глотками</div>
+    </div>
+    <div class="modal-divider"></div>
+    <p class="modal-note">Если тяга очень сильная или ты в запое — это повод обратиться к наркологу, а не бороться в одиночку. В большинстве городов России есть группы взаимопомощи «Анонимные Алкоголики» — встречи бесплатны и анонимны.</p>
+  </div>
+</div>
+
+<script>
+const COLORS = {
+  bgDeep: [16, 22, 31], bgMid: [30, 44, 61],
+  dawnStart: [46, 62, 82], dawnEnd: [232, 168, 87],
+};
+const MILESTONES = [
+  { days: 1, label: "Первый день" }, { days: 7, label: "Неделя ясности" },
+  { days: 30, label: "Месяц" }, { days: 90, label: "Квартал" },
+  { days: 180, label: "Полгода" }, { days: 365, label: "Год" },
+];
 const MOODS = [
   { key: "hard", label: "Тяжело", color: "#C9526B" },
   { key: "ok", label: "Нормально", color: "#93A3B5" },
@@ -35,870 +264,218 @@ const MOODS = [
   { key: "strong", label: "Уверенно", color: "#E8A857" },
 ];
 
-function daysBetween(startISO) {
-  const start = new Date(startISO);
-  const now = new Date();
-  const ms = now - start;
-  return Math.max(0, ms / 86400000);
-}
+let state = { startDate: null, pricePerDay: 700 };
+let entries = [];
+let selectedMood = "ok";
+let breathTimer = null;
 
-function fmtDays(d) {
-  const whole = Math.floor(d);
-  return whole.toString();
-}
-
-function nextMilestone(daysWhole) {
-  for (const m of MILESTONES) {
-    if (daysWhole < m.days) return m;
+// Simple localStorage wrapper — this is a real, standalone site (not a Claude
+// artifact), so we use the browser's own storage instead of window.storage.
+const storage = {
+  get(key) {
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? null : { key, value: v };
+    } catch (e) { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); return { key, value }; }
+    catch (e) { return null; }
   }
-  return null; // beyond all
+};
+
+function lerp(a,b,t){ return a+(b-a)*t; }
+function lerpColor(c1,c2,t){ return `rgb(${Math.round(lerp(c1[0],c2[0],t))},${Math.round(lerp(c1[1],c2[1],t))},${Math.round(lerp(c1[2],c2[2],t))})`; }
+function daysBetween(startISO){ return Math.max(0, (new Date() - new Date(startISO)) / 86400000); }
+function nextMilestone(d){ for(const m of MILESTONES){ if(d < m.days) return m; } return null; }
+function prevMilestoneDays(d){ let p=0; for(const m of MILESTONES){ if(d<m.days) return p; p=m.days; } return p; }
+
+async function loadData(){
+  try{
+    const s = storage.get('sobriety-state');
+    if(s && s.value){ state = JSON.parse(s.value); }
+    else { state = { startDate: new Date().toISOString(), pricePerDay: 700 }; storage.set('sobriety-state', JSON.stringify(state)); }
+  }catch(e){ state = { startDate: new Date().toISOString(), pricePerDay: 700 }; }
+  try{
+    const e = storage.get('sobriety-entries');
+    if(e && e.value) entries = JSON.parse(e.value);
+  }catch(e){ entries = []; }
 }
 
-function prevMilestoneDays(daysWhole) {
-  let prev = 0;
-  for (const m of MILESTONES) {
-    if (daysWhole < m.days) return prev;
-    prev = m.days;
-  }
-  return prev;
+async function persistState(){
+  const r = storage.set('sobriety-state', JSON.stringify(state));
+  if(!r) showSaveWarning();
 }
+async function persistEntries(){
+  const r = storage.set('sobriety-entries', JSON.stringify(entries));
+  if(!r) showSaveWarning();
+}
+function showSaveWarning(){ document.getElementById('saveWarning').style.display = 'block'; }
 
-// ---------- Dawn horizon (signature visual) ----------
-function DawnHorizon({ progress }) {
+function renderDawn(progress){
   const p = Math.max(0, Math.min(1, progress));
-  const skyTop = lerpColor(COLORS.bgDeep, [58, 74, 96], p);
+  const skyTop = lerpColor(COLORS.bgDeep, [58,74,96], p);
   const skyBottom = lerpColor(COLORS.dawnStart, COLORS.dawnEnd, p);
   const sunCy = lerp(140, 78, p);
   const sunR = lerp(16, 30, p);
   const fogOpacity = lerp(0.78, 0.05, p);
   const glowOpacity = lerp(0.15, 0.65, p);
-
-  return (
-    <svg viewBox="0 0 320 160" className="dawn-svg" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor={skyTop} />
-          <stop offset="100%" stopColor={skyBottom} />
-        </linearGradient>
-        <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor={COLORS.dawnEnd} stopOpacity={glowOpacity} />
-          <stop offset="100%" stopColor={COLORS.dawnEnd} stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <rect x="0" y="0" width="320" height="160" fill="url(#skyGrad)" />
-      <circle cx="160" cy={sunCy} r={sunR * 2.6} fill="url(#sunGlow)" />
-      <circle cx="160" cy={sunCy} r={sunR} fill={COLORS.dawnEnd} opacity={lerp(0.55, 1, p)} />
-      <rect x="0" y="128" width="320" height="32" fill={lerpColor(COLORS.bgDeep, COLORS.bgMid, p)} opacity="0.9" />
-      <rect x="0" y="0" width="320" height="160" fill={COLORS.mist} opacity={fogOpacity} style={{ mixBlendMode: "overlay" }} />
-    </svg>
-  );
+  const svg = document.getElementById('dawnSvg');
+  svg.innerHTML = `
+    <defs>
+      <linearGradient id="skyGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${skyTop}" />
+        <stop offset="100%" stop-color="${skyBottom}" />
+      </linearGradient>
+      <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="rgb(232,168,87)" stop-opacity="${glowOpacity}" />
+        <stop offset="100%" stop-color="rgb(232,168,87)" stop-opacity="0" />
+      </radialGradient>
+    </defs>
+    <rect x="0" y="0" width="320" height="160" fill="url(#skyGrad)" />
+    <circle cx="160" cy="${sunCy}" r="${sunR*2.6}" fill="url(#sunGlow)" />
+    <circle cx="160" cy="${sunCy}" r="${sunR}" fill="rgb(232,168,87)" opacity="${lerp(0.55,1,p)}" />
+    <rect x="0" y="128" width="320" height="32" fill="${lerpColor(COLORS.bgDeep, COLORS.bgMid, p)}" opacity="0.9" />
+    <rect x="0" y="0" width="320" height="160" fill="#EDE7DC" opacity="${fogOpacity}" style="mix-blend-mode:overlay" />
+  `;
 }
 
-// ---------- Breathing modal (SOS) ----------
-function SOSModal({ onClose }) {
-  const phases = [
-    { name: "Вдох", seconds: 4 },
-    { name: "Задержка", seconds: 7 },
-    { name: "Выдох", seconds: 8 },
-  ];
-  const [phaseIdx, setPhaseIdx] = useState(0);
-  const timerRef = useRef(null);
-
-  useEffect(() => {
-    timerRef.current = setTimeout(() => {
-      setPhaseIdx((i) => (i + 1) % phases.length);
-    }, phases[phaseIdx].seconds * 1000);
-    return () => clearTimeout(timerRef.current);
-  }, [phaseIdx]);
-
-  const scale = phaseIdx === 0 ? 1.35 : phaseIdx === 1 ? 1.35 : 0.85;
-  const duration = phases[phaseIdx].seconds;
-
-  return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-label="Помощь при тяге">
-      <div className="modal-panel">
-        <button className="icon-btn close-btn" onClick={onClose} aria-label="Закрыть">
-          <X size={20} />
-        </button>
-        <p className="modal-eyebrow">Это пройдёт</p>
-        <h2 className="modal-title">Подыши со мной</h2>
-        <div className="breath-wrap">
-          <div
-            className="breath-circle"
-            style={{ transform: `scale(${scale})`, transitionDuration: `${duration}s` }}
-          />
-          <span className="breath-label">{phases[phaseIdx].name}</span>
-        </div>
-        <p className="modal-hint">Техника 4–7–8 успокаивает нервную систему за пару минут. Дыши в своём темпе, циклы повторятся сами.</p>
-
-        <div className="tips-grid">
-          <div className="tip"><Footprints size={16} /> Выйди пройтись — 10 минут решают многое</div>
-          <div className="tip"><Wind size={16} /> Выпей стакан воды медленно, маленькими глотками</div>
-        </div>
-
-        <div className="modal-divider" />
-        <p className="modal-note">
-          Если тяга очень сильная или ты в запое — это повод обратиться к наркологу, а не бороться в одиночку.
-          В большинстве городов России есть группы взаимопомощи «Анонимные Алкоголики» — встречи бесплатны и анонимны.
-        </p>
-      </div>
-    </div>
-  );
-}
-
-// ---------- Journal entry form ----------
-function JournalForm({ onSave, onCancel }) {
-  const [mood, setMood] = useState("ok");
-  const [note, setNote] = useState("");
-  return (
-    <div className="journal-form">
-      <p className="field-label">Как сейчас</p>
-      <div className="mood-row">
-        {MOODS.map((m) => (
-          <button
-            key={m.key}
-            className={`mood-chip ${mood === m.key ? "mood-chip-active" : ""}`}
-            style={{ "--chip-color": m.color }}
-            onClick={() => setMood(m.key)}
-          >
-            {m.label}
-          </button>
-        ))}
-      </div>
-      <p className="field-label">Что происходит / что тянет выпить</p>
-      <textarea
-        className="journal-textarea"
-        rows={3}
-        placeholder="Например: тяжёлый день на работе, звонили старые друзья…"
-        value={note}
-        onChange={(e) => setNote(e.target.value)}
-      />
-      <div className="form-actions">
-        <button className="btn btn-ghost" onClick={onCancel}>Отмена</button>
-        <button className="btn btn-primary" onClick={() => onSave({ mood, note })}>
-          <Save size={15} /> Сохранить
-        </button>
-      </div>
-    </div>
-  );
-}
-
-export default function App() {
-  const [loaded, setLoaded] = useState(false);
-  const [startDate, setStartDate] = useState(null);
-  const [pricePerDay, setPricePerDay] = useState(700);
-  const [entries, setEntries] = useState([]);
-  const [view, setView] = useState("home");
-  const [showSOS, setShowSOS] = useState(false);
-  const [showJournalForm, setShowJournalForm] = useState(false);
-  const [tick, setTick] = useState(0);
-  const [saveError, setSaveError] = useState(false);
-
-  // load
-  useEffect(() => {
-    (async () => {
-      try {
-        const s = await window.storage.get("sobriety-state");
-        if (s && s.value) {
-          const parsed = JSON.parse(s.value);
-          setStartDate(parsed.startDate);
-          setPricePerDay(parsed.pricePerDay ?? 700);
-        } else {
-          const today = new Date().toISOString();
-          setStartDate(today);
-          await window.storage.set("sobriety-state", JSON.stringify({ startDate: today, pricePerDay: 700 }));
-        }
-      } catch (e) {
-        const today = new Date().toISOString();
-        setStartDate(today);
-      }
-      try {
-        const e = await window.storage.get("sobriety-entries");
-        if (e && e.value) setEntries(JSON.parse(e.value));
-      } catch (e) {
-        setEntries([]);
-      }
-      setLoaded(true);
-    })();
-  }, []);
-
-  // live tick for the counter
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 60000);
-    return () => clearInterval(id);
-  }, []);
-
-  const persistState = useCallback(async (next) => {
-    try {
-      const result = await window.storage.set("sobriety-state", JSON.stringify(next));
-      if (!result) setSaveError(true);
-    } catch (e) {
-      setSaveError(true);
-    }
-  }, []);
-
-  const persistEntries = useCallback(async (nextEntries) => {
-    try {
-      const result = await window.storage.set("sobriety-entries", JSON.stringify(nextEntries));
-      if (!result) setSaveError(true);
-    } catch (e) {
-      setSaveError(true);
-    }
-  }, []);
-
-  if (!loaded) {
-    return (
-      <div className="app-shell">
-        <style>{CSS}</style>
-        <div className="loading">Загружаю…</div>
-      </div>
-    );
-  }
-
-  const daysFloat = daysBetween(startDate);
+function renderHome(){
+  const daysFloat = daysBetween(state.startDate);
   const daysWhole = Math.floor(daysFloat);
   const nm = nextMilestone(daysWhole);
   const prevDays = prevMilestoneDays(daysWhole);
   const progress = nm ? (daysWhole - prevDays) / (nm.days - prevDays) : 1;
-  const moneySaved = Math.round(daysFloat * pricePerDay);
+  const moneySaved = Math.round(daysFloat * state.pricePerDay);
 
-  const handleReset = async () => {
-    const today = new Date().toISOString();
-    setStartDate(today);
-    await persistState({ startDate: today, pricePerDay });
-  };
+  renderDawn(progress);
+  document.getElementById('counterNum').textContent = daysWhole;
+  document.getElementById('counterLabel').textContent = daysWhole === 1 ? 'день трезвости' : (daysWhole>=2 && daysWhole<=4 ? 'дня трезвости' : 'дней трезвости');
+  document.getElementById('moneySaved').textContent = moneySaved.toLocaleString('ru-RU') + ' ₽';
+  document.getElementById('nextMilestoneDays').textContent = nm ? (nm.days - daysWhole) : '—';
+  document.getElementById('nextMilestoneCaption').textContent = nm ? `дней до «${nm.label}»` : 'все вехи пройдены';
 
-  const handlePriceChange = async (val) => {
-    const num = Math.max(0, Number(val) || 0);
-    setPricePerDay(num);
-    await persistState({ startDate, pricePerDay: num });
-  };
-
-  const handleSaveEntry = async ({ mood, note }) => {
-    const entry = { id: Date.now().toString(), date: new Date().toISOString(), mood, note };
-    const next = [entry, ...entries];
-    setEntries(next);
-    setShowJournalForm(false);
-    await persistEntries(next);
-  };
-
-  const handleDeleteEntry = async (id) => {
-    const next = entries.filter((e) => e.id !== id);
-    setEntries(next);
-    await persistEntries(next);
-  };
-
-  return (
-    <div className="app-shell">
-      <style>{CSS}</style>
-
-      {view === "home" && (
-        <div className="screen">
-          <DawnHorizon progress={progress} />
-
-          <div className="counter-block">
-            <span className="counter-num">{fmtDays(daysFloat)}</span>
-            <span className="counter-label">{daysWhole === 1 ? "день трезвости" : daysWhole >= 2 && daysWhole <= 4 ? "дня трезвости" : "дней трезвости"}</span>
-          </div>
-
-          <div className="stats-row">
-            <div className="stat-card">
-              <span className="stat-value">{moneySaved.toLocaleString("ru-RU")} ₽</span>
-              <span className="stat-caption">сэкономлено</span>
-            </div>
-            <div className="stat-card">
-              <span className="stat-value">{nm ? `${nm.days - daysWhole}` : "—"}</span>
-              <span className="stat-caption">{nm ? `дней до «${nm.label}»` : "все вехи пройдены"}</span>
-            </div>
-          </div>
-
-          <button className="sos-btn" onClick={() => setShowSOS(true)}>
-            <Wind size={18} /> Тянет выпить — помоги сейчас
-          </button>
-
-          <div className="milestones-row">
-            {MILESTONES.map((m) => (
-              <div key={m.days} className={`milestone-dot ${daysWhole >= m.days ? "milestone-reached" : ""}`}>
-                <span className="milestone-day">{m.days}</span>
-              </div>
-            ))}
-          </div>
-
-          {saveError && <p className="save-warning">Не удалось сохранить данные. Изменения могут не сохраниться.</p>}
-
-          <p className="disclaimer">
-            Если за плечами долгий тяжёлый запой, резкий отказ от алкоголя может быть опасен для здоровья.
-            Перед стартом стоит посоветоваться с наркологом.
-          </p>
-        </div>
-      )}
-
-      {view === "journal" && (
-        <div className="screen">
-          <div className="screen-header">
-            <h2 className="screen-title">Дневник</h2>
-            {!showJournalForm && (
-              <button className="icon-btn" onClick={() => setShowJournalForm(true)} aria-label="Новая запись">
-                <Plus size={18} />
-              </button>
-            )}
-          </div>
-
-          {showJournalForm && (
-            <JournalForm onSave={handleSaveEntry} onCancel={() => setShowJournalForm(false)} />
-          )}
-
-          {!showJournalForm && entries.length === 0 && (
-            <div className="empty-state">
-              <BookOpen size={22} />
-              <p>Пока пусто. Запиши, что чувствуешь сейчас — так проще заметить свои триггеры.</p>
-            </div>
-          )}
-
-          {!showJournalForm && entries.map((e) => {
-            const mood = MOODS.find((m) => m.key === e.mood) || MOODS[1];
-            const d = new Date(e.date);
-            return (
-              <div className="entry-card" key={e.id}>
-                <div className="entry-top">
-                  <span className="entry-mood" style={{ color: mood.color }}>{mood.label}</span>
-                  <span className="entry-date">{d.toLocaleDateString("ru-RU", { day: "numeric", month: "short" })}, {d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" })}</span>
-                  <button className="icon-btn entry-delete" onClick={() => handleDeleteEntry(e.id)} aria-label="Удалить запись">
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-                {e.note && <p className="entry-note">{e.note}</p>}
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {view === "settings" && (
-        <div className="screen">
-          <h2 className="screen-title">Настройки</h2>
-
-          <div className="settings-card">
-            <label className="field-label" htmlFor="price">Сколько в среднем уходило на алкоголь в день, ₽</label>
-            <input
-              id="price"
-              type="number"
-              className="text-input"
-              value={pricePerDay}
-              onChange={(e) => handlePriceChange(e.target.value)}
-              min="0"
-            />
-          </div>
-
-          <div className="settings-card">
-            <p className="field-label">Дата начала трезвости</p>
-            <p className="settings-static">{new Date(startDate).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}</p>
-            <button className="btn btn-ghost btn-reset" onClick={handleReset}>Начать отсчёт заново — сегодня</button>
-          </div>
-
-          <div className="settings-card">
-            <p className="field-label">Если тяжело прямо сейчас</p>
-            <p className="settings-static-small">
-              <Phone size={13} style={{ marginRight: 6, verticalAlign: "-2px" }} />
-              Обратись в наркологический диспансер своего города или на горячую линию психологической помощи — искать лучше заранее, а не в кризис.
-            </p>
-          </div>
-        </div>
-      )}
-
-      <nav className="tab-bar">
-        <button className={`tab-btn ${view === "home" ? "tab-active" : ""}`} onClick={() => setView("home")}>
-          <HomeIcon size={18} />
-          <span>Путь</span>
-        </button>
-        <button className={`tab-btn ${view === "journal" ? "tab-active" : ""}`} onClick={() => setView("journal")}>
-          <BookOpen size={18} />
-          <span>Дневник</span>
-        </button>
-        <button className={`tab-btn ${view === "settings" ? "tab-active" : ""}`} onClick={() => setView("settings")}>
-          <Settings size={18} />
-          <span>Настройки</span>
-        </button>
-      </nav>
-
-      {showSOS && <SOSModal onClose={() => setShowSOS(false)} />}
+  const row = document.getElementById('milestonesRow');
+  row.innerHTML = MILESTONES.map(m => `
+    <div class="milestone-dot ${daysWhole >= m.days ? 'milestone-reached' : ''}">
+      <span class="milestone-day">${m.days}</span>
     </div>
-  );
+  `).join('');
 }
 
-const CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+function renderMoodRow(){
+  const row = document.getElementById('moodRow');
+  row.innerHTML = MOODS.map(m => `
+    <button class="mood-chip" data-key="${m.key}" style="border:1px solid ${m.color}; color:${selectedMood===m.key?'#10161F':m.color}; background:${selectedMood===m.key?m.color:'transparent'}; font-weight:${selectedMood===m.key?'600':'400'}" onclick="selectMood('${m.key}')">${m.label}</button>
+  `).join('');
+}
+function selectMood(key){ selectedMood = key; renderMoodRow(); }
 
-* { box-sizing: border-box; }
-
-.app-shell {
-  min-height: 100vh;
-  background: #10161F;
-  color: #EDE7DC;
-  font-family: 'Inter', -apple-system, sans-serif;
-  display: flex;
-  justify-content: center;
+function showJournalForm(show){
+  document.getElementById('journalForm').style.display = show ? 'block' : 'none';
+  document.getElementById('newEntryBtn').style.display = show ? 'none' : 'flex';
+  if(show){ selectedMood = 'ok'; renderMoodRow(); document.getElementById('journalNote').value=''; }
 }
 
-.loading { padding: 40px; color: #93A3B5; }
-
-.screen {
-  width: 100%;
-  max-width: 420px;
-  padding: 20px 20px 96px;
-  min-height: 100vh;
-  position: relative;
+async function saveEntry(){
+  const note = document.getElementById('journalNote').value.trim();
+  entries.unshift({ id: Date.now().toString(), date: new Date().toISOString(), mood: selectedMood, note });
+  showJournalForm(false);
+  renderJournal();
+  await persistEntries();
 }
 
-.dawn-svg {
-  width: 100%;
-  height: 160px;
-  border-radius: 18px;
-  display: block;
-  margin-top: 4px;
+async function deleteEntry(id){
+  entries = entries.filter(e => e.id !== id);
+  renderJournal();
+  await persistEntries();
 }
 
-.counter-block {
-  text-align: center;
-  margin-top: -34px;
-  position: relative;
-  z-index: 2;
+function renderJournal(){
+  const list = document.getElementById('entriesList');
+  const empty = document.getElementById('entriesEmpty');
+  empty.style.display = entries.length === 0 ? 'flex' : 'none';
+  list.innerHTML = entries.map(e => {
+    const mood = MOODS.find(m => m.key === e.mood) || MOODS[1];
+    const d = new Date(e.date);
+    const dateStr = d.toLocaleDateString('ru-RU', {day:'numeric', month:'short'}) + ', ' + d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+    return `
+      <div class="entry-card">
+        <div class="entry-top">
+          <span class="entry-mood" style="color:${mood.color}">${mood.label}</span>
+          <span class="entry-date">${dateStr}</span>
+          <button class="entry-delete" onclick="deleteEntry('${e.id}')">✕</button>
+        </div>
+        ${e.note ? `<p class="entry-note">${escapeHtml(e.note)}</p>` : ''}
+      </div>
+    `;
+  }).join('');
+}
+function escapeHtml(s){ const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+function renderSettings(){
+  document.getElementById('priceInput').value = state.pricePerDay;
+  document.getElementById('startDateDisplay').textContent = new Date(state.startDate).toLocaleDateString('ru-RU', {day:'numeric', month:'long', year:'numeric'});
 }
 
-.counter-num {
-  display: block;
-  font-family: 'IBM Plex Mono', monospace;
-  font-weight: 600;
-  font-size: 68px;
-  line-height: 1;
-  letter-spacing: -1px;
-  font-variant-numeric: tabular-nums;
-  color: #F4EFE6;
-  text-shadow: 0 2px 24px rgba(232,168,87,0.25);
+async function resetStart(){
+  state.startDate = new Date().toISOString();
+  await persistState();
+  renderHome(); renderSettings();
 }
 
-.counter-label {
-  display: block;
-  margin-top: 6px;
-  font-size: 13px;
-  color: #93A3B5;
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
+document.getElementById('priceInput')?.addEventListener('change', async (e) => {
+  state.pricePerDay = Math.max(0, Number(e.target.value) || 0);
+  await persistState();
+  renderHome();
+});
+
+function switchView(view){
+  ['home','journal','settings'].forEach(v => {
+    document.getElementById(v).classList.toggle('active', v === view);
+    document.getElementById('tab' + v.charAt(0).toUpperCase()+v.slice(1)).classList.toggle('tab-active', v === view);
+  });
+  if(view === 'home') renderHome();
+  if(view === 'journal') renderJournal();
+  if(view === 'settings') renderSettings();
 }
 
-.stats-row {
-  display: flex;
-  gap: 10px;
-  margin-top: 22px;
+function openSOS(){
+  document.getElementById('sosModal').classList.add('active');
+  startBreathing();
+}
+function closeSOS(){
+  document.getElementById('sosModal').classList.remove('active');
+  clearTimeout(breathTimer);
+}
+function startBreathing(){
+  const phases = [{name:'Вдох', seconds:4, scale:1.35}, {name:'Задержка', seconds:7, scale:1.35}, {name:'Выдох', seconds:8, scale:0.85}];
+  let idx = 0;
+  const circle = document.getElementById('breathCircle');
+  const label = document.getElementById('breathLabel');
+  function tick(){
+    const ph = phases[idx];
+    label.textContent = ph.name;
+    circle.style.transitionDuration = ph.seconds + 's';
+    circle.style.transform = `scale(${ph.scale})`;
+    breathTimer = setTimeout(() => { idx = (idx+1) % phases.length; tick(); }, ph.seconds * 1000);
+  }
+  tick();
 }
 
-.stat-card {
-  flex: 1;
-  background: #1B2A3A;
-  border: 1px solid rgba(237,231,220,0.08);
-  border-radius: 14px;
-  padding: 14px;
-  text-align: center;
+(async function init(){
+  await loadData();
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('home').classList.add('active');
+  renderHome();
+  setInterval(renderHome, 60000);
+})();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(() => {});
+  });
 }
-
-.stat-value {
-  display: block;
-  font-family: 'Fraunces', serif;
-  font-size: 20px;
-  font-weight: 600;
-  color: #E8A857;
-}
-
-.stat-caption {
-  display: block;
-  margin-top: 4px;
-  font-size: 11.5px;
-  color: #93A3B5;
-}
-
-.sos-btn {
-  width: 100%;
-  margin-top: 18px;
-  background: #C9526B;
-  color: #FBEEF0;
-  border: none;
-  border-radius: 14px;
-  padding: 15px;
-  font-size: 15px;
-  font-weight: 600;
-  font-family: 'Inter', sans-serif;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: transform 0.15s ease, filter 0.15s ease;
-}
-.sos-btn:hover { filter: brightness(1.08); }
-.sos-btn:active { transform: scale(0.98); }
-.sos-btn:focus-visible { outline: 2px solid #E8A857; outline-offset: 2px; }
-
-.milestones-row {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 26px;
-  padding: 0 2px;
-}
-
-.milestone-dot {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  background: #1B2A3A;
-  border: 1px solid rgba(237,231,220,0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.milestone-reached {
-  background: #E8A857;
-  border-color: #E8A857;
-}
-
-.milestone-day {
-  font-family: 'IBM Plex Mono', monospace;
-  font-size: 9.5px;
-  color: #93A3B5;
-}
-.milestone-reached .milestone-day { color: #10161F; font-weight: 600; }
-
-.disclaimer {
-  margin-top: 22px;
-  font-size: 12px;
-  line-height: 1.6;
-  color: #6C7A8A;
-  border-top: 1px solid rgba(237,231,220,0.08);
-  padding-top: 14px;
-}
-
-.save-warning {
-  margin-top: 14px;
-  font-size: 12px;
-  color: #C9526B;
-}
-
-.screen-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.screen-title {
-  font-family: 'Fraunces', serif;
-  font-size: 24px;
-  font-weight: 600;
-  margin: 4px 0 18px;
-}
-
-.icon-btn {
-  background: #1B2A3A;
-  border: 1px solid rgba(237,231,220,0.1);
-  color: #EDE7DC;
-  border-radius: 10px;
-  width: 36px;
-  height: 36px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-}
-.icon-btn:focus-visible { outline: 2px solid #E8A857; outline-offset: 2px; }
-
-.empty-state {
-  text-align: center;
-  color: #93A3B5;
-  padding: 50px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.entry-card {
-  background: #1B2A3A;
-  border: 1px solid rgba(237,231,220,0.08);
-  border-radius: 14px;
-  padding: 14px;
-  margin-bottom: 10px;
-}
-
-.entry-top {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.entry-mood {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.entry-date {
-  font-size: 11.5px;
-  color: #6C7A8A;
-  flex: 1;
-}
-
-.entry-delete {
-  width: 28px;
-  height: 28px;
-  background: transparent;
-  border: none;
-}
-
-.entry-note {
-  margin: 8px 0 0;
-  font-size: 13.5px;
-  line-height: 1.55;
-  color: #D8D1C4;
-}
-
-.journal-form {
-  background: #1B2A3A;
-  border: 1px solid rgba(237,231,220,0.08);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-
-.field-label {
-  font-size: 12.5px;
-  color: #93A3B5;
-  margin: 0 0 8px;
-}
-
-.mood-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 16px;
-}
-
-.mood-chip {
-  --chip-color: #93A3B5;
-  background: transparent;
-  border: 1px solid var(--chip-color);
-  color: var(--chip-color);
-  border-radius: 20px;
-  padding: 7px 14px;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
-.mood-chip-active {
-  background: var(--chip-color);
-  color: #10161F;
-  font-weight: 600;
-}
-
-.journal-textarea {
-  width: 100%;
-  background: #10161F;
-  border: 1px solid rgba(237,231,220,0.12);
-  border-radius: 10px;
-  color: #EDE7DC;
-  padding: 10px 12px;
-  font-family: 'Inter', sans-serif;
-  font-size: 13.5px;
-  resize: vertical;
-}
-.journal-textarea:focus-visible { outline: 2px solid #E8A857; }
-
-.form-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-.btn {
-  border-radius: 10px;
-  padding: 9px 16px;
-  font-size: 13.5px;
-  font-weight: 600;
-  cursor: pointer;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-family: 'Inter', sans-serif;
-}
-
-.btn-primary { background: #E8A857; color: #10161F; }
-.btn-ghost { background: transparent; color: #93A3B5; border: 1px solid rgba(237,231,220,0.15); }
-.btn:focus-visible { outline: 2px solid #E8A857; outline-offset: 2px; }
-
-.settings-card {
-  background: #1B2A3A;
-  border: 1px solid rgba(237,231,220,0.08);
-  border-radius: 14px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.text-input {
-  width: 100%;
-  background: #10161F;
-  border: 1px solid rgba(237,231,220,0.12);
-  border-radius: 10px;
-  color: #EDE7DC;
-  padding: 10px 12px;
-  font-size: 14px;
-  font-family: 'IBM Plex Mono', monospace;
-}
-.text-input:focus-visible { outline: 2px solid #E8A857; }
-
-.settings-static { font-size: 15px; font-family: 'Fraunces', serif; }
-.settings-static-small { font-size: 12.5px; line-height: 1.6; color: #93A3B5; }
-
-.btn-reset { margin-top: 12px; width: 100%; justify-content: center; }
-
-.tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: center;
-  background: rgba(16,22,31,0.92);
-  backdrop-filter: blur(10px);
-  border-top: 1px solid rgba(237,231,220,0.08);
-}
-
-.tab-btn {
-  flex: 1;
-  max-width: 140px;
-  background: transparent;
-  border: none;
-  color: #6C7A8A;
-  padding: 12px 0 10px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  font-family: 'Inter', sans-serif;
-  cursor: pointer;
-}
-
-.tab-active { color: #E8A857; }
-.tab-btn:focus-visible { outline: 2px solid #E8A857; outline-offset: -2px; }
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(10,14,20,0.82);
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  z-index: 50;
-}
-
-.modal-panel {
-  width: 100%;
-  max-width: 420px;
-  background: #182432;
-  border-radius: 22px 22px 0 0;
-  padding: 24px 22px 30px;
-  position: relative;
-  animation: slideUp 0.25s ease;
-}
-
-@keyframes slideUp {
-  from { transform: translateY(24px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.close-btn { position: absolute; top: 16px; right: 16px; }
-
-.modal-eyebrow {
-  font-size: 12px;
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  color: #C9526B;
-  margin: 0 0 4px;
-}
-
-.modal-title {
-  font-family: 'Fraunces', serif;
-  font-size: 24px;
-  margin: 0 0 20px;
-}
-
-.breath-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 20px 0 24px;
-}
-
-.breath-circle {
-  width: 100px;
-  height: 100px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 40% 35%, #E8A857, #C9526B);
-  transition-property: transform;
-  transition-timing-function: ease-in-out;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .breath-circle { transition-duration: 0.3s !important; }
-}
-
-.breath-label {
-  font-size: 14px;
-  color: #93A3B5;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-}
-
-.modal-hint {
-  font-size: 13px;
-  line-height: 1.6;
-  color: #93A3B5;
-  text-align: center;
-  margin: 0 0 18px;
-}
-
-.tips-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.tip {
-  display: flex;  align-itemsa center;
-  gap: 10px;
-  background: #1B2A3A;
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 13px;
-  color: #D8D1C4;
-}
-
-.modal-divider {
-  height: 1px;
-  background: rgba(237,231,220,0.08);
-  margin: 18px 0 14px;
-}
-
-.modal-note {
-  font-size: 12px;
-  line-height: 1.6;
-  color: #6C7A8A;
-  margin: 0;
-}
-
-@media (max-width: 360px) {
-  .counter-num { font-size: 56px; }
-}
-`;
+</script>
+</body>
+</html>
